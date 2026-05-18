@@ -166,17 +166,17 @@ int main(void)
     
     uint8_t low_voltage_mode[3] = {0, 0, 0};
 
-    // SVARBU: Perjungiame į tikslų LV režimą TIK JEI matome tikrą bateriją (> 1.0 V) ir ji saugi (< 3.0 V)
+    // SVARBU: Perjungiame į tikslų LV režimą TIK JEI esame tikri, kad tai ne triukšmas (> 0.20 V)
     // V1 kanalas (PB0)
-    if (itampa[0] > 1.0f && itampa[0] < 3.0f) { 
+    if (itampa[0] > 0.20f && itampa[0] < 3.0f) { 
         low_voltage_mode[0] = 1; GPIO_InitStruct.Pin = GPIO_PIN_0; GPIO_InitStruct.Mode = GPIO_MODE_INPUT; HAL_GPIO_Init(GPIOB, &GPIO_InitStruct); 
     }
     // V2 kanalas (PC1)
-    if (itampa[1] > 1.0f && itampa[1] < 3.0f) { 
+    if (itampa[1] > 0.20f && itampa[1] < 3.0f) { 
         low_voltage_mode[1] = 1; GPIO_InitStruct.Pin = GPIO_PIN_1; GPIO_InitStruct.Mode = GPIO_MODE_INPUT; HAL_GPIO_Init(GPIOC, &GPIO_InitStruct); 
     }
     // V3 kanalas (PC0)
-    if (itampa[2] > 1.0f && itampa[2] < 3.0f) { 
+    if (itampa[2] > 0.20f && itampa[2] < 3.0f) { 
         low_voltage_mode[2] = 1; GPIO_InitStruct.Pin = GPIO_PIN_0; GPIO_InitStruct.Mode = GPIO_MODE_INPUT; HAL_GPIO_Init(GPIOC, &GPIO_InitStruct); 
     }
 
@@ -196,7 +196,7 @@ int main(void)
             HAL_ADC_Stop(&hadc);
         }
 
-        // Jūsų asmeniškai apskaičiuoti tikslūs kalibravimo koeficientai ŽEMAI įtampai
+
 				float kalibracija_lv[3] = {0.9615f, 0.9615f, 0.9615f};
 
         // Perskaičiuojame tiksliai (daugiklis x1.0) pritaikant kalibraciją
@@ -211,14 +211,27 @@ int main(void)
     // 3. TRIUKŠMŲ FILTRAS IR IŠVEDIMAS
     // =========================================================================
     
-    // Viskas, kas yra žemiau 1.0 V (tušti laidai ir triukšmas), yra nulinama
+
+		float suma = 0.0f;
+    int aktyvus_kanalai = 0;
+
+    // Viskas, kas yra žemiau 1 V (tušti laidai ir triukšmas), yra nulinama
     for (int i = 0; i < 3; i++) {
         if (itampa[i] < 1.0f) { 
             itampa[i] = 0.0f;
+        } else {
+            // Jei kanalas aktyvus (rodo > 0.05 V), pridedame jį prie sumos
+            suma += itampa[i];
+            aktyvus_kanalai++;
         }
     }
 
-    vidurkis = (itampa[0] + itampa[1] + itampa[2]) / 3.0f;
+    // Išmanusis vidurkis: daliname tik iš tų kanalų, prie kurių prijungta įtampa
+    if (aktyvus_kanalai > 0) {
+        vidurkis = suma / (float)aktyvus_kanalai;
+    } else {
+        vidurkis = 0.0f;
+    }
 
     int v1_sv = (int)itampa[0]; int v1_tr = (int)(fabs(itampa[0] - v1_sv) * 100);
     int v2_sv = (int)itampa[1]; int v2_tr = (int)(fabs(itampa[1] - v2_sv) * 100);
